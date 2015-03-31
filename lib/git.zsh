@@ -1,4 +1,4 @@
-# get the name of the branch we are on
+# Constructs the git info section of the prompt
 function git_prompt_info() {
   if [[ "$(command git config --get oh-my-zsh.hide-status 2>/dev/null)" != "1" ]]; then
     ref=$(command git symbolic-ref HEAD 2> /dev/null) || \
@@ -9,38 +9,50 @@ function git_prompt_info() {
 
 
 # Checks if working tree is dirty
-parse_git_dirty() {
-  local STATUS=''
+# Outputs the clean/dirty/etc string to include in prompt
+function parse_git_dirty() {
   local FLAGS
-  local COPID=''
+  local OMZ_TMPDIR=$TMPDIR/oh-my-zsh
+  # Always use visible error indicator even if theme doesn't define one, to avoid silently
+  # looking like a clean directory when we can't get info
+  local TIMEDOUT_TXT=${ZSH_THEME_GIT_PROMPT_TIMEDOUT:-???}
+  if [[ ! -d $OMZ_TMPDIR ]]; then
+    mkdir -p $OMZ_TMPDIR || (echo $TIMEDOUT_TXT && return)
+  fi
   FLAGS=('--porcelain')
   if [[ "$(command git config --get oh-my-zsh.hide-dirty)" != "1" ]]; then
     if [[ $POST_1_7_2_GIT -gt 0 ]]; then
       FLAGS+='--ignore-submodules=dirty'
     fi
-    if [[ "$DISABLE_UNTRACKED_FILES_DIRTY" == "true" ]]; then
+    if [[ $DISABLE_UNTRACKED_FILES_DIRTY == "true" ]]; then
       FLAGS+='--untracked-files=no'
     fi
-    # Use coproc to timebox `git status` so slow repo access doesn't hang the prompt
-    # Use dummy "xxx" to distinguish timeouts from empty output
-    local END_OUTPUT="_end_of_status_"
-    coproc (command git status ${FLAGS} 2> /dev/null; echo $END_OUTPUT)
-    COPID=$!
-    read -p -t $ZSH_THEME_SCM_CHECK_TIMEOUT STATUS
-    if [[ -z $STATUS ]]; then
-      echo "$ZSH_THEME_GIT_PROMPT_TIMEDOUT"
-      # Get rid of that git run
-      kill -s KILL $COPID &>/dev/null
-    elif [[ $STATUS = $END_OUTPUT ]]; then
-      echo "$ZSH_THEME_GIT_PROMPT_CLEAN"
+    # Use a serverized git run to timebox `git status` so slow repo access doesn't hang the prompt
+    local GIT_FIFO=$OMZ_TMPDIR/omz-parse_git_dirty-git-status.$$
+    # Clean up any leftover from previous aborted run
+    [[ -f $GIT_FIFO ]] && rm -f $GIT_FIFO
+    mkfifo $GIT_FIFO || (echo $TIMEDOUT_TXT && return)
+    command git status ${FLAGS} >$GIT_FIFO 2>/dev/null &
+    local GIT_PID=$!
+    # Use dummy "__unset__" to distinguish timeouts from empty output
+    local STATUS=__unset__
+    read -t $ZSH_THEME_SCM_CHECK_TIMEOUT STATUS <$GIT_FIFO
+    rm $GIT_FIFO
+    if [[ $STATUS == __unset__ ]]; then
+      # Variable didn't get set = read timeout
+      echo $TIMEDOUT_TXT
+      # Get rid of that git run if it's still going
+      kill -s KILL $GIT_PID &>/dev/null
+    elif [[ -z $STATUS ]]; then
+      echo $ZSH_THEME_GIT_PROMPT_CLEAN
     else
-      echo "$ZSH_THEME_GIT_PROMPT_DIRTY"
+      echo $ZSH_THEME_GIT_PROMPT_DIRTY
     fi
   fi
 }
 
-# get the difference between the local and remote branches
-git_remote_status() {
+# Gets the difference between the local and remote branches
+function git_remote_status() {
     remote=${$(command git rev-parse --verify ${hook_com[branch]}@{upstream} --symbolic-full-name 2>/dev/null)/refs\/remotes\/}
     if [[ -n ${remote} ]] ; then
         ahead=$(command git rev-list ${hook_com[branch]}@{upstream}..HEAD 2>/dev/null | wc -l)
@@ -85,7 +97,7 @@ function git_prompt_long_sha() {
 }
 
 # Get the status of the working tree
-git_prompt_status() {
+function git_prompt_status() {
   INDEX=$(command git status --porcelain -b 2> /dev/null)
   STATUS=""
   if $(echo "$INDEX" | command grep -E '^\?\? ' &> /dev/null); then
