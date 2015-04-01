@@ -12,6 +12,7 @@ function git_prompt_info() {
 # Outputs a brief clean/dirty/timeout string that indicates whether the repo has uncommitted changes.
 # This is in contrast to git_prompt_info, which provdes a
 # lengthier status string with more possible indicators.
+# This quick test does not require the full output of `git status`
 function parse_git_dirty() {
   local FLAGS
   local OMZ_TMPDIR=$TMPDIR/oh-my-zsh
