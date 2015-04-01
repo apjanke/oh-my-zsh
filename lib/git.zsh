@@ -106,8 +106,6 @@ function git_prompt_status() {
 
 # got_prompt_status implementation that parses status output using built-in zsh features
 function _git_prompt_status_zsh_parse() {
-  # INDEX is historically global; leaving it non-local in case some themes are using
-  # it directly
   local -a flags git_status
   if [[ $DISABLE_UNTRACKED_FILES_DIRTY == "true" ]]; then
     flags+='--untracked-files=no'
@@ -127,7 +125,7 @@ function _git_prompt_status_zsh_parse() {
     x=${line[1]}
     y=${line[2]}
     is_ahead='n'
-    is_behind-'n'
+    is_behind='n'
     if [[ $x == '?' || $y == '?' ]]; then
       has[untracked]='y'
     fi
@@ -142,7 +140,7 @@ function _git_prompt_status_zsh_parse() {
     fi
     # I don't know if 'T' is even possible - I don't see it in the git doco -
     # but it was in the old grep-based logic here
-    if [[ $x =='M' || $y == 'M' || $y == 'T' ]]; then
+    if [[ $x == 'M' || $y == 'M' || $y == 'T' ]]; then
       has[modified]='y'
     fi
     if [[ $x == 'U' || $y == 'U' ]]; then
