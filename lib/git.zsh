@@ -100,6 +100,7 @@ function git_prompt_long_sha() {
 
 # Get the status of the working tree
 function git_prompt_status() {
+  #TODO: Timebox these `git status` calls, too
   _git_prompt_status_zsh_parse
 }
 
@@ -116,15 +117,17 @@ function _git_prompt_status_zsh_parse() {
     # Not in a git directory; we can skip other checks
     return 0
   fi
-  # This parsing logic is based on the old grep-based parsing logic
-  # It may not be as correct as possible wrt the git specification, but it
-  # preserves old oh-my-zsh behavior
+  # This parsing logic is faster than doing repeated shell-outs to grep, and probably more
+  # accurate because it can check the "X" and "Y" codes independently
   local -A has
   local line code x y branch_status
+  local is_ahead is_behind
   for line ($git_status); do
     code=${line[1,2]}
     x=${line[1]}
     y=${line[2]}
+    is_ahead='n'
+    is_behind-'n'
     if [[ $x == '?' || $y == '?' ]]; then
       has[untracked]='y'
     fi
@@ -134,12 +137,12 @@ function _git_prompt_status_zsh_parse() {
     if [[ $x == 'R' ]]; then
       has[renamed]='y'
     fi
-    if [[ $x == 'A' || $x == 'C'  || $x == 'M' ]]; then
+    if [[ $x == 'A' || $x == 'C' ]]; then
       has[added]='y'
     fi
     # I don't know if 'T' is even possible - I don't see it in the git doco -
     # but it was in the old grep-based logic here
-    if [[ $y == 'M' || $y == 'T' ]]; then
+    if [[ $x =='M' || $y == 'M' || $y == 'T' ]]; then
       has[modified]='y'
     fi
     if [[ $x == 'U' || $y == 'U' ]]; then
@@ -148,9 +151,15 @@ function _git_prompt_status_zsh_parse() {
     if [[ $code == '##' ]]; then
       if [[ $line =~ '\[.*\]$' ]]; then
         branch_status=$MATCH
-        [[ $branch_status =~ 'ahead' ]] && has[ahead]='y'
-        [[ $branch_status =~ 'behind' ]] && has[behind]='y'
-        [[ $branch_status =~ 'diverged' ]] && has[diverged]='y'
+        [[ $branch_status =~ 'ahead' ]] && is_ahead='y'
+        [[ $branch_status =~ 'behind' ]] && is_behind='y'
+        if [[ $branch_status =~ 'diverged' || ( $is_ahead == 'y' && $is_behind == 'y' ) ]]; then
+          has[diverged]='y'
+        elif [[ $is_ahead == 'y' ]]; then
+          has[ahead]='y'
+        elif [[ $is_behind == 'y' ]]; then
+          has[behind]='y'
+        fi
       fi
     fi
     if [[ ${#has} == 9 ]]; then
