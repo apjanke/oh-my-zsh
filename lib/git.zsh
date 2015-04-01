@@ -139,8 +139,6 @@ function _git_prompt_status_zsh_parse() {
     if [[ $x == 'A' || $x == 'C' ]]; then
       has[added]='y'
     fi
-    # I don't know if 'T' is even possible - I don't see it in the git doco -
-    # but it was in the old grep-based logic here
     if [[ $x == 'M' || $y == 'M' || $y == 'T' ]]; then
       has[modified]='y'
     fi
