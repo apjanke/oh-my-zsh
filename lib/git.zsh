@@ -8,8 +8,10 @@ function git_prompt_info() {
 }
 
 
-# Checks if working tree is dirty
-# Outputs the clean/dirty/etc string to include in prompt
+# A simple clean/dirty status check
+# Outputs a brief clean/dirty/timeout string that indicates whether the repo has uncommitted changes.
+# This is in contrast to git_prompt_info, which provdes a
+# lengthier status string with more possible indicators.
 function parse_git_dirty() {
   local FLAGS
   local OMZ_TMPDIR=$TMPDIR/oh-my-zsh
@@ -98,36 +100,70 @@ function git_prompt_long_sha() {
 
 # Get the status of the working tree
 function git_prompt_status() {
-  INDEX=$(command git status --porcelain -b 2> /dev/null)
+  # INDEX is historically global; leaving it non-local in case some themes are using
+  # it directly
+  local -a flags
+  if [[ $DISABLE_UNTRACKED_FILES_DIRTY == "true" ]]; then
+    flags+='--untracked-files=no'
+  fi
+  INDEX=($(command git status --porcelain -b $flags 2> /dev/null))
+  if [[ $? != 0 ]]; then
+    # Not in a git directory; we can skip other checks
+    return 0
+  fi
+  # This parsing logic is based on the old grep-based parsing logic
+  # It may not be as correct as possible wrt the git specification, but it
+  # preserves old oh-my-zsh behavior
+  local -A has
+  local line code x y
+  for line ($INDEX); do
+    code=${line[1,2]}
+    x=${line[1]}
+    y=${line[2]}
+    if [[ $x == '?' || $y == '?' ]]; then
+      has[untracked]='y'
+    fi
+    if [[ $x == 'D' || $y == 'D' ]]; then
+      has[deleted]='y'
+    fi
+    if [[ $x == 'R' ]]; then
+      has[renamed]='y'
+    fi
+    if [[ $x == 'A' || $x == 'C'  || $x == 'M' ]]; then
+      has[added]='y'
+    fi
+    # I don't know if 'T' is even possible - I don't see it in the git doco -
+    # but it was in the old grep-based logic here
+    if [[ $y == 'M' || $y == 'T' ]]; then
+      has[modified]='y'
+    fi
+    if [[ $x == 'U' || $y == 'U' ]]; then
+      has[unmerged]='y'
+    fi
+    if [[ ]]
+    if [[ ${#has} == 9 ]]; then
+      # We've hit all the possibilities and all bits are on; no need to keep parsing
+      break
+    fi
+
+  done
+
   STATUS=""
-  if $(echo "$INDEX" | command grep -E '^\?\? ' &> /dev/null); then
-    STATUS="$ZSH_THEME_GIT_PROMPT_UNTRACKED$STATUS"
-  fi
-  if $(echo "$INDEX" | grep '^A  ' &> /dev/null); then
-    STATUS="$ZSH_THEME_GIT_PROMPT_ADDED$STATUS"
-  elif $(echo "$INDEX" | grep '^M  ' &> /dev/null); then
-    STATUS="$ZSH_THEME_GIT_PROMPT_ADDED$STATUS"
-  fi
-  if $(echo "$INDEX" | grep '^ M ' &> /dev/null); then
-    STATUS="$ZSH_THEME_GIT_PROMPT_MODIFIED$STATUS"
-  elif $(echo "$INDEX" | grep '^AM ' &> /dev/null); then
-    STATUS="$ZSH_THEME_GIT_PROMPT_MODIFIED$STATUS"
-  elif $(echo "$INDEX" | grep '^ T ' &> /dev/null); then
-    STATUS="$ZSH_THEME_GIT_PROMPT_MODIFIED$STATUS"
-  fi
-  if $(echo "$INDEX" | grep '^R  ' &> /dev/null); then
-    STATUS="$ZSH_THEME_GIT_PROMPT_RENAMED$STATUS"
-  fi
-  if $(echo "$INDEX" | grep '^ D ' &> /dev/null); then
-    STATUS="$ZSH_THEME_GIT_PROMPT_DELETED$STATUS"
-  elif $(echo "$INDEX" | grep '^D  ' &> /dev/null); then
-    STATUS="$ZSH_THEME_GIT_PROMPT_DELETED$STATUS"
-  elif $(echo "$INDEX" | grep '^AD ' &> /dev/null); then
-    STATUS="$ZSH_THEME_GIT_PROMPT_DELETED$STATUS"
-  fi
+  [[ ${has[diverged]} == 'y' ]] && STATUS+=$ZSH_THEME_GIT_PROMPT_DIVERGED
+  [[ ${has[behind]} == 'y' ]] && STATUS+=$ZSH_THEME_GIT_PROMPT_BEHIND
+  [[ ${has[ahead]} == 'y' ]] && STATUS+=$ZSH_THEME_GIT_PROMPT_AHEAD
+  [[ ${has[unmerged]} == 'y' ]] && STATUS+=$ZSH_THEME_GIT_PROMPT_UNMERGED
+  [[ ${has[deleted]} == 'y' ]] && STATUS+=$ZSH_THEME_GIT_PROMPT_DELETED
+  [[ ${has[renamed]} == 'y' ]] && STATUS+=$ZSH_THEME_GIT_PROMPT_RENAMED
+  [[ ${has[modified]} == 'y' ]] && STATUS+=$ZSH_THEME_GIT_PROMPT_MODIFIED
+  [[ ${has[added]} == 'y' ]] && STATUS+=$ZSH_THEME_GIT_PROMPT_ADDED
+  [[ ${has[untracked]} == 'y' ]] && STATUS+=$ZSH_THEME_GIT_PROMPT_UNTRACKED
+
+
   if $(command git rev-parse --verify refs/stash >/dev/null 2>&1); then
     STATUS="$ZSH_THEME_GIT_PROMPT_STASHED$STATUS"
   fi
+
   if $(echo "$INDEX" | grep '^UU ' &> /dev/null); then
     STATUS="$ZSH_THEME_GIT_PROMPT_UNMERGED$STATUS"
   fi
@@ -143,10 +179,12 @@ function git_prompt_status() {
   echo $STATUS
 }
 
-#compare the provided version of git to the version installed and on path
-#prints 1 if input version <= installed version
-#prints -1 otherwise
-function git_compare_version() {
+# Compares the provided version of git to the version installed and on path
+# Prints 1 if installed version > input version
+# Prints -1 if installed version < input version
+# Prints 0 if installed version = input version
+# Always returns 0
+function _git_compare_version() {
   local INPUT_GIT_VERSION=$1;
   local INSTALLED_GIT_VERSION
   INPUT_GIT_VERSION=(${(s/./)INPUT_GIT_VERSION});
@@ -166,7 +204,7 @@ function git_compare_version() {
   echo 0
 }
 
-#this is unlikely to change so make it all statically assigned
-POST_1_7_2_GIT=$(git_compare_version "1.7.2")
-#clean up the namespace slightly by removing the checker function
-unset -f git_compare_version
+# This is unlikely to change so make it all statically assigned
+POST_1_7_2_GIT=$(_git_compare_version "1.7.2")
+# Clean up the namespace slightly by removing the checker function
+unset -f _git_compare_version
