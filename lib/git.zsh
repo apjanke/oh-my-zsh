@@ -15,12 +15,16 @@ function git_prompt_info() {
 # This quick test does not require the full output of `git status`
 function parse_git_dirty() {
   local FLAGS
-  local OMZ_TMPDIR=$TMPDIR/oh-my-zsh
+  local SYS_TMPDIR=${TMPDIR:-$TEMP}
+  local OMZ_TMPDIR=$SYS_TMPDIR/oh-my-zsh
   # Always use visible error indicator even if theme doesn't define one, to avoid silently
   # looking like a clean directory when we can't get info
   local TIMEDOUT_TXT=${ZSH_THEME_GIT_PROMPT_TIMEDOUT:-???}
   if [[ ! -d $OMZ_TMPDIR ]]; then
-    mkdir -p $OMZ_TMPDIR || (echo $TIMEDOUT_TXT && return)
+    if ! mkdir -p $OMZ_TMPDIR; then
+	  echo $TIMEDOUT_TXT
+	  return
+	fi
   fi
   FLAGS=('--porcelain')
   if [[ "$(command git config --get oh-my-zsh.hide-dirty)" != "1" ]]; then
@@ -34,7 +38,10 @@ function parse_git_dirty() {
     local GIT_FIFO=$OMZ_TMPDIR/omz-parse_git_dirty-git-status.$$
     # Clean up any leftover from previous aborted run
     [[ -f $GIT_FIFO ]] && rm -f $GIT_FIFO
-    mkfifo $GIT_FIFO || (echo $TIMEDOUT_TXT && return)
+    if ! mkfifo $GIT_FIFO; then
+	  echo $TIMEDOUT_TXT
+	  return
+	fi
     command git status ${FLAGS} >$GIT_FIFO 2>/dev/null &
     local GIT_PID=$!
     # Use dummy "__unset__" to distinguish timeouts from empty output
