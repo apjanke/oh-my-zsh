@@ -39,9 +39,9 @@ ZSH_THEME_GIT_PROMPT_PREFIX="git:("         # Prefix at the very beginning of th
 ZSH_THEME_GIT_PROMPT_SUFFIX=")"             # At the very end of the prompt
 ZSH_THEME_GIT_PROMPT_DIRTY="*"              # Text to display if the branch is dirty
 ZSH_THEME_GIT_PROMPT_CLEAN=""               # Text to display if the branch is clean
-ZSH_THEME_GIT_PROMPT_TIMEDOUT="?"            # Text to display if status check timed out
+ZSH_THEME_GIT_PROMPT_TIMEDOUT="?"           # Text to display if status check timed out
 
-# Timeout (in seconds, fractions OK) for SCM (git/hg/etc) info checks done
+# Timeout (in seconds, fractions okay) for SCM (git/hg/etc) info checks done
 # inside prompt
 ZSH_THEME_SCM_CHECK_TIMEOUT=1
 
