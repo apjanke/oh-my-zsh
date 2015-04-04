@@ -1,9 +1,64 @@
+# lib/git.zsh - Various functions for incorporating git status info 
+# into the zsh PROMPT.
+
+
 # Constructs the git info section of the prompt
+# This prompt section includes the current branch and a short clean/dirty indicator
 function git_prompt_info() {
   if [[ "$(command git config --get oh-my-zsh.hide-status 2>/dev/null)" != "1" ]]; then
     ref=$(command git symbolic-ref HEAD 2> /dev/null) || \
     ref=$(command git rev-parse --short HEAD 2> /dev/null) || return 0
     echo "$ZSH_THEME_GIT_PROMPT_PREFIX${ref#refs/heads/}$(parse_git_dirty)$ZSH_THEME_GIT_PROMPT_SUFFIX"
+  fi
+}
+
+# Back-compatibility wrapper
+function parse_git_dirty() {
+  git_prompt_dirty
+}
+
+# A time-boxed serverized invocation of `git status` that gets just the 
+# first line of output. This prevents locking up the prompt on slow repos.
+# _git_status_timeboxed_one output_var
+#  IN: $GIT_ARGS - arguments to pass to git (array)
+#  OUT: output_var - output of the git command
+#  RETURN: 0 if git command completed, 1 if timed out or other error occurred
+function _git_status_timeboxed_oneline() {
+  local OUT_VAR=$1
+  local SYS_TMPDIR=${TMPDIR:-$TEMP}
+  local OMZ_TMPDIR=$SYS_TMPDIR/oh-my-zsh
+  if [[ ! -d $OMZ_TMPDIR ]]; then
+    if ! mkdir -p $OMZ_TMPDIR; then
+      return 1
+    fi
+  fi
+  local GIT_FIFO=$OMZ_TMPDIR/omz-prompt-git.$$
+  # Clean up any leftover from previous aborted run
+  [[ -f $GIT_FIFO ]] && rm -f $GIT_FIFO
+  if ! mkfifo $GIT_FIFO; then
+    return 1
+  fi
+  command git $GIT_ARGS >$GIT_FIFO 2>/dev/null &
+  local GIT_PID=$!
+  # Use dummy "__unset__" to distinguish timeouts from empty output
+  local STATUS=__unset__
+  read -t $ZSH_THEME_SCM_CHECK_TIMEOUT STATUS <$GIT_FIFO
+
+  rm $GIT_FIFO
+  if [[ $STATUS == __unset__ ]]; then
+    # Variable didn't get set = read timeout
+    # Get rid of that git run if it's still going
+    kill -s KILL $GIT_PID &>/dev/null
+    eval "${OUT_VAR}=''"
+    return 1
+  elif [[ -z $STATUS ]]; then
+    eval "${OUT_VAR}=''"
+    return 0
+  else
+    # Get rid of that git run if it's still going
+    kill -s KILL $GIT_PID &>/dev/null
+    eval "${OUT_VAR}=\$STATUS"
+    return 0
   fi
 }
 
@@ -13,72 +68,48 @@ function git_prompt_info() {
 # This is in contrast to git_prompt_info, which provdes a
 # lengthier status string with more possible indicators.
 # This quick test does not require the full output of `git status`
-function parse_git_dirty() {
-  local FLAGS
-  local SYS_TMPDIR=${TMPDIR:-$TEMP}
-  local OMZ_TMPDIR=$SYS_TMPDIR/oh-my-zsh
+function git_prompt_dirty() {
+  local GIT_ARGS STATUS GIT_OUTPUT
   # Always use visible error indicator even if theme doesn't define one, to avoid silently
   # looking like a clean directory when we can't get info
   local TIMEDOUT_TXT=${ZSH_THEME_GIT_PROMPT_TIMEDOUT:-???}
-  if [[ ! -d $OMZ_TMPDIR ]]; then
-    if ! mkdir -p $OMZ_TMPDIR; then
-	  echo $TIMEDOUT_TXT
-	  return
-	fi
-  fi
-  FLAGS=('--porcelain')
+  GIT_ARGS=(status '--porcelain')
   if [[ "$(command git config --get oh-my-zsh.hide-dirty)" != "1" ]]; then
     if [[ $POST_1_7_2_GIT -gt 0 ]]; then
-      FLAGS+='--ignore-submodules=dirty'
+      GIT_ARGS+='--ignore-submodules=dirty'
     fi
     if [[ $DISABLE_UNTRACKED_FILES_DIRTY == "true" ]]; then
-      FLAGS+='--untracked-files=no'
-    fi
-    # Use a serverized git run to timebox `git status` so slow repo access doesn't hang the prompt
-    local GIT_FIFO=$OMZ_TMPDIR/omz-parse_git_dirty-git-status.$$
-    # Clean up any leftover from previous aborted run
-    [[ -f $GIT_FIFO ]] && rm -f $GIT_FIFO
-    if ! mkfifo $GIT_FIFO; then
-	  echo $TIMEDOUT_TXT
-	  return
-	fi
-    command git status ${FLAGS} >$GIT_FIFO 2>/dev/null &
-    local GIT_PID=$!
-    # Use dummy "__unset__" to distinguish timeouts from empty output
-    local STATUS=__unset__
-    read -t $ZSH_THEME_SCM_CHECK_TIMEOUT STATUS <$GIT_FIFO
-    rm $GIT_FIFO
-    if [[ $STATUS == __unset__ ]]; then
-      # Variable didn't get set = read timeout
-      echo $TIMEDOUT_TXT
-      # Get rid of that git run if it's still going
-      kill -s KILL $GIT_PID &>/dev/null
-    elif [[ -z $STATUS ]]; then
-      echo $ZSH_THEME_GIT_PROMPT_CLEAN
-    else
-      echo $ZSH_THEME_GIT_PROMPT_DIRTY
+      GIT_ARGS+='--untracked-files=no'
     fi
   fi
+  # Use a serverized git run to timebox `git status` so slow repo access doesn't hang the prompt
+  _git_status_timeboxed_oneline GIT_OUTPUT
+  STATUS=$?
+  if [[ $STATUS != 0 ]]; then
+    echo $TIMEDOUT_TXT
+  elif [[ -n $GIT_OUTPUT ]]; then
+    echo $ZSH_THEME_GIT_PROMPT_DIRTY
+  else
+    echo $ZSH_THEME_GIT_PROMPT_CLEAN
+  fi
+
 }
 
 # Gets the difference between the local and remote branches
 function git_remote_status() {
-    remote=${$(command git rev-parse --verify ${hook_com[branch]}@{upstream} --symbolic-full-name 2>/dev/null)/refs\/remotes\/}
-    if [[ -n ${remote} ]] ; then
-        ahead=$(command git rev-list ${hook_com[branch]}@{upstream}..HEAD 2>/dev/null | wc -l)
-        behind=$(command git rev-list HEAD..${hook_com[branch]}@{upstream} 2>/dev/null | wc -l)
+  remote=${$(command git rev-parse --verify ${hook_com[branch]}@{upstream} --symbolic-full-name 2>/dev/null)/refs\/remotes\/}
+  if [[ -n ${remote} ]] ; then
+    ahead=$(command git rev-list ${hook_com[branch]}@{upstream}..HEAD 2>/dev/null | wc -l)
+    behind=$(command git rev-list HEAD..${hook_com[branch]}@{upstream} 2>/dev/null | wc -l)
 
-        if [ $ahead -eq 0 ] && [ $behind -gt 0 ]
-        then
-            echo "$ZSH_THEME_GIT_PROMPT_BEHIND_REMOTE"
-        elif [ $ahead -gt 0 ] && [ $behind -eq 0 ]
-        then
-            echo "$ZSH_THEME_GIT_PROMPT_AHEAD_REMOTE"
-        elif [ $ahead -gt 0 ] && [ $behind -gt 0 ]
-        then
-            echo "$ZSH_THEME_GIT_PROMPT_DIVERGED_REMOTE"
-        fi
+    if [ $ahead -eq 0 ] && [ $behind -gt 0 ]; then
+      echo "$ZSH_THEME_GIT_PROMPT_BEHIND_REMOTE"
+    elif [ $ahead -gt 0 ] && [ $behind -eq 0 ]; then
+      echo "$ZSH_THEME_GIT_PROMPT_AHEAD_REMOTE"
+    elif [ $ahead -gt 0 ] && [ $behind -gt 0 ]; then
+      echo "$ZSH_THEME_GIT_PROMPT_DIVERGED_REMOTE"
     fi
+  fi
 }
 
 # Checks if there are commits ahead from remote
@@ -98,11 +129,13 @@ function git_commits_ahead() {
 
 # Formats prompt string for current git commit short SHA
 function git_prompt_short_sha() {
+  local SHA
   SHA=$(command git rev-parse --short HEAD 2> /dev/null) && echo "$ZSH_THEME_GIT_PROMPT_SHA_BEFORE$SHA$ZSH_THEME_GIT_PROMPT_SHA_AFTER"
 }
 
 # Formats prompt string for current git commit long SHA
 function git_prompt_long_sha() {
+  local SHA
   SHA=$(command git rev-parse HEAD 2> /dev/null) && echo "$ZSH_THEME_GIT_PROMPT_SHA_BEFORE$SHA$ZSH_THEME_GIT_PROMPT_SHA_AFTER"
 }
 
@@ -112,9 +145,11 @@ function git_prompt_status() {
   _git_prompt_status_zsh_parse
 }
 
-# got_prompt_status implementation that parses status output using built-in zsh features
+# git_prompt_status implementation that parses status output using built-in zsh features
 function _git_prompt_status_zsh_parse() {
-  local -a flags git_status
+  local -a flags GIT_ARGS
+  local git_status
+  flags=()
   if [[ $DISABLE_UNTRACKED_FILES_DIRTY == "true" ]]; then
     flags+='--untracked-files=no'
   fi
@@ -189,9 +224,9 @@ function _git_prompt_status_zsh_parse() {
   echo $STATUS
 }
 
-# git_prompt_status implementation that shells out ot grep
+# git_prompt_status implementation that shells out to grep
 # This is the original implmentation. I'm keeping it around for now to allow 
-# comparative benchmarking.
+# comparative benchmarking. It is replaced by _git_prompt_status_zsh_parse.
 function _git_prompt_status_grep() {
   INDEX=$(command git status --porcelain -b 2> /dev/null)
   STATUS=""
