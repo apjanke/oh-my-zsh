@@ -25,7 +25,10 @@ function parse_git_dirty() {
 #  RETURN: 0 if git command completed, 1 if timed out or other error occurred
 function _git_status_timeboxed_oneline() {
   local OUT_VAR=$1
-  local SYS_TMPDIR=${TMPDIR:-$TEMP}
+  local SYS_TMPDIR=${${TMPDIR:-$TEMP}:-/tmp}
+  if [[ ! -d $SYS_TMPDIR ]]; then
+    return 1
+  fi
   local OMZ_TMPDIR=$SYS_TMPDIR/oh-my-zsh
   if [[ ! -d $OMZ_TMPDIR ]]; then
     if ! mkdir -p $OMZ_TMPDIR; then
