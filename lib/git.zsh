@@ -12,7 +12,38 @@ function git_prompt_info() {
   fi
 }
 
-# Back-compatibility wrapper
+# A simple clean/dirty status check
+# Outputs a brief clean/dirty/timeout string that indicates whether the repo has uncommitted changes.
+# This is in contrast to git_prompt_info, which provides a
+# lengthier status string with more possible indicators.
+# This quick test does not require the full output of `git status`
+function git_prompt_dirty() {
+  local GIT_ARGS STATUS GIT_STATUS_OUT
+  # Always use visible error indicator even if theme doesn't define one, to avoid silently
+  # looking like a clean directory when we can't get info
+  local TIMEDOUT_TXT=${ZSH_THEME_GIT_PROMPT_TIMEDOUT:-???}
+  GIT_ARGS=(status '--porcelain')
+  if [[ "$(command git config --get oh-my-zsh.hide-dirty)" != "1" ]]; then
+    if [[ $POST_1_7_2_GIT -gt 0 ]]; then
+      GIT_ARGS+='--ignore-submodules=dirty'
+    fi
+    if [[ $DISABLE_UNTRACKED_FILES_DIRTY == "true" ]]; then
+      GIT_ARGS+='--untracked-files=no'
+    fi
+  fi
+  # Use a serverized git run to timebox `git status` so slow repo access doesn't hang the prompt
+  _git_status_timeboxed_oneline
+  STATUS=$?
+  if [[ $STATUS != 0 ]]; then
+    echo $TIMEDOUT_TXT
+  elif [[ -n $GIT_STATUS_OUT ]]; then
+    echo $ZSH_THEME_GIT_PROMPT_DIRTY
+  else
+    echo $ZSH_THEME_GIT_PROMPT_CLEAN
+  fi
+}
+
+# Back-compatibility alias for git_prompt_dirty()
 function parse_git_dirty() {
   git_prompt_dirty
 }
@@ -21,10 +52,9 @@ function parse_git_dirty() {
 # first line of output. This prevents locking up the prompt on slow repos.
 # _git_status_timeboxed_one output_var
 #  IN: $GIT_ARGS - arguments to pass to git (array)
-#  OUT: output_var - output of the git command
+#  OUT: $GIT_STATUS_OUT - output of the git command
 #  RETURN: 0 if git command completed, 1 if timed out or other error occurred
 function _git_status_timeboxed_oneline() {
-  local OUT_VAR=$1
   local SYS_TMPDIR=${${TMPDIR:-$TEMP}:-/tmp}
   if [[ ! -d $SYS_TMPDIR ]]; then
     return 1
@@ -52,51 +82,19 @@ function _git_status_timeboxed_oneline() {
     # Variable didn't get set = read timeout
     # Get rid of that git run if it's still going
     kill -s KILL $GIT_PID &>/dev/null
-    eval "${OUT_VAR}=''"
+    GIT_STATUS_OUT=''
     return 1
   elif [[ -z $STATUS ]]; then
-    eval "${OUT_VAR}=''"
+    GIT_STATUS_OUT=''
     return 0
   else
     # Get rid of that git run if it's still going
     kill -s KILL $GIT_PID &>/dev/null
-    eval "${OUT_VAR}=\$STATUS"
+    GIT_STATUS_OUT="$STATUS"
     return 0
   fi
 }
 
-
-# A simple clean/dirty status check
-# Outputs a brief clean/dirty/timeout string that indicates whether the repo has uncommitted changes.
-# This is in contrast to git_prompt_info, which provdes a
-# lengthier status string with more possible indicators.
-# This quick test does not require the full output of `git status`
-function git_prompt_dirty() {
-  local GIT_ARGS STATUS GIT_OUTPUT
-  # Always use visible error indicator even if theme doesn't define one, to avoid silently
-  # looking like a clean directory when we can't get info
-  local TIMEDOUT_TXT=${ZSH_THEME_GIT_PROMPT_TIMEDOUT:-???}
-  GIT_ARGS=(status '--porcelain')
-  if [[ "$(command git config --get oh-my-zsh.hide-dirty)" != "1" ]]; then
-    if [[ $POST_1_7_2_GIT -gt 0 ]]; then
-      GIT_ARGS+='--ignore-submodules=dirty'
-    fi
-    if [[ $DISABLE_UNTRACKED_FILES_DIRTY == "true" ]]; then
-      GIT_ARGS+='--untracked-files=no'
-    fi
-  fi
-  # Use a serverized git run to timebox `git status` so slow repo access doesn't hang the prompt
-  _git_status_timeboxed_oneline GIT_OUTPUT
-  STATUS=$?
-  if [[ $STATUS != 0 ]]; then
-    echo $TIMEDOUT_TXT
-  elif [[ -n $GIT_OUTPUT ]]; then
-    echo $ZSH_THEME_GIT_PROMPT_DIRTY
-  else
-    echo $ZSH_THEME_GIT_PROMPT_CLEAN
-  fi
-
-}
 
 # Gets the difference between the local and remote branches
 function git_remote_status() {
@@ -144,7 +142,6 @@ function git_prompt_long_sha() {
 
 # Get the status of the working tree
 function git_prompt_status() {
-  #TODO: Timebox these `git status` calls, too
   _git_prompt_status_zsh_parse
 }
 
@@ -228,7 +225,7 @@ function _git_prompt_status_zsh_parse() {
 }
 
 # git_prompt_status implementation that shells out to grep
-# This is the original implmentation. I'm keeping it around for now to allow 
+# This is the original implementation. I'm keeping it around for now to allow 
 # comparative benchmarking. It is replaced by _git_prompt_status_zsh_parse.
 function _git_prompt_status_grep() {
   INDEX=$(command git status --porcelain -b 2> /dev/null)
