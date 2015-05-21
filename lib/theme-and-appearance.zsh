@@ -349,6 +349,7 @@ function _omz_apply_theme_defaults() {
   #ZSH_THEME_GIT_PROMPT_UNMERGED=
   #ZSH_THEME_GIT_PROMPT_DIVERGED=
   #ZSH_THEME_GIT_PROMPT_UNTRACKED=
+  #ZSH_THEME_GIT_PROMPT_TIMEDOUT="?"           # Text to display if status check timed out
   # nvm_prompt_info variables
   #ZSH_THEME_NVM_PROMPT_PREFIX=
   #ZSH_THEME_NVM_PROMPT_SUFFIX=
@@ -443,6 +444,10 @@ if [[ -n $WINDOW ]]; then
 else
     SCREEN_NO=""
 fi
+
+# Timeout (in seconds, fractions okay) for SCM (git/hg/etc) info checks done
+# inside prompt
+ZSH_THEME_SCM_CHECK_TIMEOUT=1
 
 # OMZ themes use promptsubst, so make sure it's on
 setopt prompt_subst
