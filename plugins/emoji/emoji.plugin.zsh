@@ -12,7 +12,7 @@
 #   $emoji2         - Auxiliary and combining characters
 #   $emoji_flags    - Maps country names to flag characters (using region-indicators)
 #   $emoji_skintone - Skin tone modifiers (from Unicode 8.0)
-#   $emoji_groups   - Named groups of emoji. Keys are group names; values are space-separated 
+#   $emoji_groups   - Named groups of emoji. Keys are group names; values are whitespace-separated 
 #                       lists of character names
 #
 # Functions:
@@ -33,35 +33,40 @@
 #
 # To output a specific emoji, use:
 #    $> echo $emoji[<name>]
-#    ex: $> echo $emoji[mouse_face]
+# E.g.: 
+#    $> echo $emoji[mouse_face]
 #
 # To output a random emoji, use:
 #    $> random_emoji
 # To output a random emoji from a particular group, use:
+#    $> random_emoji <group>
+# E.g.:
 #    $> random_emoji fruits
 #    $> random_emoji animals
 #    $> random_emoji vehicles
 #    $> random_emoji faces
-# The valid group names can be found with ${(k)emoji_groups}
+# The valid group names can be found with `echo ${(k)emoji_groups}`
 #
-# To list all available emoji with names, use:
+# To list all available emoji with their names, use:
 #    $> display_emoji
 #    $> display_emoji fruits
 #    $> display_emoji animals
 #    $> display_emoji vehicles
 #    $> display_emoji faces
 #
-# To use an emoji in a prompt:
+# To use emoji in a prompt:
 #    PROMPT="$emoji[penguin]  > ""
 #    PROMPT='$(random_emoji fruits)  > '
 #    surfer=$emoji[surfer]
 #    PROMPT="$surfer  > "
 #
 #
+# TODO: Move doco to a README
+# TODO: Factor out parsing from generation in update_emoji.pl
 # TODO: Incorporate CLDR data for ordering and groupings
-# TODO: Short :bracket: style names
+# TODO: Short :bracket: style names (from gemoji)
 # TODO: Country codes for flags
-# TODO: ZWJ combining function? 
+# TODO: ZWJ combining function?
 
 _omz_emoji_plugin_dir="${0:h}"
 
@@ -69,7 +74,7 @@ _omz_emoji_plugin_dir="${0:h}"
 
 local LC_ALL=en_US.UTF-8
 
-typeset -gA emoji_groups
+typeset -gAH emoji_groups
 typeset -gAH emoji_con
 typeset -gAH emoji2
 typeset -gAH emoji_skintone
@@ -86,16 +91,16 @@ unset _omz_emoji_plugin_dir
 # which can be displayed on their own.
 #emoji[combining_enclosing_keycap]="\U20E3"
 
-emoji[regional_indicator_symbol_letter_d_regional_indicator_symbol_letter_e]='\xF0\x9F\x87\xA9\xF0\x9F\x87\xAA'
-emoji[regional_indicator_symbol_letter_g_regional_indicator_symbol_letter_b]='\xF0\x9F\x87\xAC\xF0\x9F\x87\xA7'
-emoji[regional_indicator_symbol_letter_c_regional_indicator_symbol_letter_n]='\xF0\x9F\x87\xA8\xF0\x9F\x87\xB3'
-emoji[regional_indicator_symbol_letter_j_regional_indicator_symbol_letter_p]='\xF0\x9F\x87\xAF\xF0\x9F\x87\xB5'
-emoji[regional_indicator_symbol_letter_k_regional_indicator_symbol_letter_r]='\xF0\x9F\x87\xB0\xF0\x9F\x87\xB7'
-emoji[regional_indicator_symbol_letter_f_regional_indicator_symbol_letter_r]='\xF0\x9F\x87\xAB\xF0\x9F\x87\xB7'
-emoji[regional_indicator_symbol_letter_e_regional_indicator_symbol_letter_s]='\xF0\x9F\x87\xAA\xF0\x9F\x87\xB8'
-emoji[regional_indicator_symbol_letter_i_regional_indicator_symbol_letter_t]='\xF0\x9F\x87\xAE\xF0\x9F\x87\xB9'
-emoji[regional_indicator_symbol_letter_u_regional_indicator_symbol_letter_s]='\xF0\x9F\x87\xBA\xF0\x9F\x87\xB8'
-emoji[regional_indicator_symbol_letter_r_regional_indicator_symbol_letter_u]='\xF0\x9F\x87\xB7\xF0\x9F\x87\xBA'
+emoji[regional_indicator_symbol_letter_d_regional_indicator_symbol_letter_e]=$'\xF0\x9F\x87\xA9\xF0\x9F\x87\xAA'
+emoji[regional_indicator_symbol_letter_g_regional_indicator_symbol_letter_b]=$'\xF0\x9F\x87\xAC\xF0\x9F\x87\xA7'
+emoji[regional_indicator_symbol_letter_c_regional_indicator_symbol_letter_n]=$'\xF0\x9F\x87\xA8\xF0\x9F\x87\xB3'
+emoji[regional_indicator_symbol_letter_j_regional_indicator_symbol_letter_p]=$'\xF0\x9F\x87\xAF\xF0\x9F\x87\xB5'
+emoji[regional_indicator_symbol_letter_k_regional_indicator_symbol_letter_r]=$'\xF0\x9F\x87\xB0\xF0\x9F\x87\xB7'
+emoji[regional_indicator_symbol_letter_f_regional_indicator_symbol_letter_r]=$'\xF0\x9F\x87\xAB\xF0\x9F\x87\xB7'
+emoji[regional_indicator_symbol_letter_e_regional_indicator_symbol_letter_s]=$'\xF0\x9F\x87\xAA\xF0\x9F\x87\xB8'
+emoji[regional_indicator_symbol_letter_i_regional_indicator_symbol_letter_t]=$'\xF0\x9F\x87\xAE\xF0\x9F\x87\xB9'
+emoji[regional_indicator_symbol_letter_u_regional_indicator_symbol_letter_s]=$'\xF0\x9F\x87\xBA\xF0\x9F\x87\xB8'
+emoji[regional_indicator_symbol_letter_r_regional_indicator_symbol_letter_u]=$'\xF0\x9F\x87\xB7\xF0\x9F\x87\xBA'
 
 # Nonstandard alias names
 emoji[vulcan_salute]=$'\U1F596'
@@ -134,12 +139,11 @@ emoji_skintone[6]=$'\U1F3FF'
 # Emoji groups
 # These are stored in a single associative array, $emoji_groups, to avoid cluttering up the global
 # namespace, and to allow adding additional group definitions at run time.
-# The keys are the group names, and the values are space-separated lists of emoji character names.
+# The keys are the group names, and the values are whitespace-separated lists of emoji character names.
 #
 # These extra local arrays are used to allow more convenient formatting of the source code.
 
-local emoji_fruits
-emoji_fruits=(
+emoji_groups[fruits]="
   tomato
   aubergine
   grapes
@@ -155,11 +159,9 @@ emoji_fruits=(
   strawberry
   lemon
   pear
-)
-emoji_groups[fruits]="$emoji_fruits"
+"
 
-local emoji_vehicles
-emoji_vehicles=(
+emoji_groups[vehicles]="
   airplane
   rocket
   railway_car
@@ -198,11 +200,9 @@ emoji_vehicles=(
   bicyclist
   mountain_bicyclist
   sailboat
-)
-emoji_groups[vehicles]="$emoji_vehicles"
+"
 
-local emoji_animals
-emoji_animals=(
+emoji_groups[animals]="
   snail
   snake
   horse
@@ -264,11 +264,9 @@ emoji_animals=(
   dog
   pig
   dromedary_camel
-)
-emoji_groups[animals]="$emoji_animals"
+"
 
-local emoji_faces
-emoji_faces=(
+emoji_groups[faces]="
   grinning_face_with_smiling_eyes
   face_with_tears_of_joy
   smiling_face_with_open_mouth
@@ -307,8 +305,7 @@ emoji_faces=(
   flushed_face
   dizzy_face
   face_with_medical_mask
-)
-emoji_groups[faces]="$emoji_faces"
+"
 
 }
 
@@ -317,12 +314,12 @@ emoji_groups[faces]="$emoji_faces"
 #  random_emoji [group]
 #
 function random_emoji() {
-  local group_name=$1
+  local group=$1
   local names
-  if [[ -n "$group_name" ]]; then
-  	names=(${(z)emoji_groups[$group_name]})
-  else
+  if [[ -z "$group" || "$group" == "all" ]]; then
   	names=(${(k)emoji})
+  else
+  	names=(${=emoji_groups[$group_name]})
   fi
   local list_size=$#names
   local random_index=$(( ( RANDOM % $list_size ) + 1 ))
@@ -337,10 +334,10 @@ function random_emoji() {
 function display_emoji() {
   local group=$1
   local names
-  if [[ -n "$group" ]]; then
-    names=(${(z)emoji_groups[$group]})
-  else
+  if [[ -z "$group" || "$group" == "all" ]]; then
   	names=(${(k)emoji})
+  else
+    names=(${=emoji_groups[$group]})
   fi
   # The extra spaces in output here are a hack for readability, since some
   # terminals treat these emoji chars as single-width.
