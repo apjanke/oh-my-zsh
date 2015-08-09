@@ -20,6 +20,10 @@ if [[ -z "$ZSH_CACHE_DIR" ]]; then
   ZSH_CACHE_DIR="$ZSH/cache/"
 fi
 
+# Load early-run custom files (which can add and configure plugins to be loaded)
+for config_file ($ZSH_CUSTOM/early/*.zsh(N)); do
+  source $config_file
+done
 
 # Load all of the config files in ~/oh-my-zsh that end in .zsh
 # TIP: Add files you don't want in git to .gitignore
