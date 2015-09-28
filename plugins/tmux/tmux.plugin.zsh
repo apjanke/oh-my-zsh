@@ -60,6 +60,7 @@ fi
 
 # Wrapper function for tmux.
 function _zsh_tmux_plugin_run() {
+  emulate -L zsh
   local tmux_cmd
   tmux_cmd=(command tmux)
   [[ "$ZSH_TMUX_ITERM2" == "true" ]] && tmux_cmd+="-CC"
@@ -69,7 +70,11 @@ function _zsh_tmux_plugin_run() {
     \tmux $@
   elif [[ "$ZSH_TMUX_AUTOCONNECT" == "true" ]]; then
     # Try to connect to an existing session.
-    $tmux_cmd attach || $tmux_cmd new-session
+    if [[ -n "$ZSH_TMUX_AUTOSTART_NAME" ]]; then
+      $tmux_cmd attach -t $ZSH_TMUX_AUTOSTART_NAME || $tmux_cmd new-session -s $ZSH_TMUX_AUTOSTART_NAME
+    else
+      $tmux_cmd attach || $tmux_cmd new-session
+    fi
     if [[ "$ZSH_TMUX_AUTOQUIT" == "true" ]]; then
       exit
     fi
@@ -81,7 +86,6 @@ function _zsh_tmux_plugin_run() {
     fi
   fi
 }
-
 # Use the completions for tmux for our function
 compdef _tmux _zsh_tmux_plugin_run
 
