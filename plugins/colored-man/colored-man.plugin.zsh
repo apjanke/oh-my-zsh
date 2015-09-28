@@ -16,33 +16,36 @@ EOF
     fi
 fi
 
-zstyle :omz:plugins:colored-man mb $(printf "\e[1;31m")
-zstyle :omz:plugins:colored-man md $(printf "\e[1;31m")
-zstyle :omz:plugins:colored-man me $(printf "\e[0m")
-zstyle :omz:plugins:colored-man se $(printf "\e[0m")
-zstyle :omz:plugins:colored-man so $(printf "\e[1;44;33m")
-zstyle :omz:plugins:colored-man ue $(printf "\e[0m")
-zstyle :omz:plugins:colored-man us $(printf "\e[1;32m")
+# This works by overriding parts of the termcap definition just
+# for `less`
+() {
+  local context=:omz:plugins:colored-man
+  zstyle $context mb '$fg[red]'          # begin "blink"
+  zstyle $context md '$fg[red]'          # begin "bold"
+  zstyle $context so '$fg_bold[yellow]$bg[blue]'  # begin standout
+  zstyle $context se '$reset_color'      # end standout
+  zstyle $context us '$fg_bold[green]$termcap[us]'   # start "underline"
+  zstyle $context ue '$reset_color'      # end "underline"
+  zstyle $context me '$reset_color'      # end all modes
+}
 
 man() {
-    local _mb _md _me _se _so _ue _us
+    local _mb _md _me _se _so _ue _us cap str
+    local -A style
 
-    zstyle -s :omz:plugins:colored-man mb _mb
-    zstyle -s :omz:plugins:colored-man md _md
-    zstyle -s :omz:plugins:colored-man me _me
-    zstyle -s :omz:plugins:colored-man se _se
-    zstyle -s :omz:plugins:colored-man so _so
-    zstyle -s :omz:plugins:colored-man ue _ue
-    zstyle -s :omz:plugins:colored-man us _us
+    for cap ( mb md so se us ue me ); do
+      zstyle -s :omz:plugins:colored-man $cap str
+      eval "style[$cap]=$str"
+    done
 
     env \
-      LESS_TERMCAP_mb=$_mb\
-      LESS_TERMCAP_md=$_md\
-      LESS_TERMCAP_me=$_me\
-      LESS_TERMCAP_se=$_se\
-      LESS_TERMCAP_so=$_so\
-      LESS_TERMCAP_ue=$_ue\
-      LESS_TERMCAP_us=$_us\
+      LESS_TERMCAP_mb=$style[mb] \
+      LESS_TERMCAP_md=$style[md] \
+      LESS_TERMCAP_me=$style[me] \
+      LESS_TERMCAP_se=$style[se] \
+      LESS_TERMCAP_so=$style[so] \
+      LESS_TERMCAP_ue=$style[ue] \
+      LESS_TERMCAP_us=$style[us] \
       PAGER=/usr/bin/less \
       _NROFF_U=1 \
       PATH=${HOME}/bin:${PATH} \
