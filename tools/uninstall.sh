@@ -1,24 +1,24 @@
 echo "Removing ~/.oh-my-zsh"
-if [ -d ~/.oh-my-zsh ]
+if [ -d "$HOME/.oh-my-zsh" ]
 then
-  rm -rf ~/.oh-my-zsh
+  rm -rf "$HOME/.oh-my-zsh"
 fi
 
 echo "Looking for original zsh config..."
-if [ -f ~/.zshrc.pre-oh-my-zsh ] || [ -h ~/.zshrc.pre-oh-my-zsh ]
+if [ -f "$HOME/.zshrc.pre-oh-my-zsh" ] || [ -h "$HOME/.zshrc.pre-oh-my-zsh" ]
 then
   echo "Found ~/.zshrc.pre-oh-my-zsh -- Restoring to ~/.zshrc";
 
-  if [ -f ~/.zshrc ] || [ -h ~/.zshrc ]
+  if [ -f "$HOME/.zshrc "] || [ -h "$HOME/.zshrc" ]
   then
     ZSHRC_SAVE=".zshrc.omz-uninstalled-`date +%Y%m%d%H%M%S`";
     echo "Found ~/.zshrc -- Renaming to ~/${ZSHRC_SAVE}";
-    mv ~/.zshrc ~/${ZSHRC_SAVE};
+    mv "$HOME/.zshrc" "$HOME/${ZSHRC_SAVE}";
   fi
 
-  mv ~/.zshrc.pre-oh-my-zsh ~/.zshrc;
+  mv "$HOME/.zshrc.pre-oh-my-zsh" "$HOME/.zshrc";
 
-  source ~/.zshrc;
+  source "$HOME/.zshrc";
 else
   if hash chsh >/dev/null 2>&1
   then

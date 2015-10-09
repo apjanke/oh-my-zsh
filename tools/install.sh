@@ -29,7 +29,7 @@ fi
 unset CHECK_ZSH_INSTALLED
 
 if [ ! -n "$ZSH" ]; then
-  ZSH=~/.oh-my-zsh
+  ZSH="$HOME/.oh-my-zsh"
 fi
 
 if [ -d "$ZSH" ]; then
@@ -50,7 +50,7 @@ hash git >/dev/null 2>&1 || {
   echo "Error: git is not installed"
   exit 1
 }
-env git clone --depth=1 https://github.com/robbyrussell/oh-my-zsh.git $ZSH || {
+env git clone --depth=1 https://github.com/robbyrussell/oh-my-zsh.git "$ZSH" || {
   printf "Error: git clone of oh-my-zsh repo failed\n"
   exit 1
 }
@@ -65,23 +65,23 @@ if [ "$OSTYPE" = cygwin ]; then
 fi
 
 printf "${BLUE}Looking for an existing zsh config...${NORMAL}\n"
-if [ -f ~/.zshrc ] || [ -h ~/.zshrc ]; then
+if [ -f "$HOME/.zshrc" ] || [ -h "$HOME/.zshrc" ]; then
   printf "${YELLOW}Found ~/.zshrc.${NORMAL} ${GREEN}Backing up to ~/.zshrc.pre-oh-my-zsh${NORMAL}\n";
-  mv ~/.zshrc ~/.zshrc.pre-oh-my-zsh;
+  mv "$HOME/.zshrc" "$HOME/.zshrc.pre-oh-my-zsh";
 fi
 
 printf "${BLUE}Using the Oh My Zsh template file and adding it to ~/.zshrc${NORMAL}\n"
-cp $ZSH/templates/zshrc.zsh-template ~/.zshrc
+cp "$ZSH/templates/zshrc.zsh-template" "$HOME/.zshrc"
 sed "/^export ZSH=/ c\\
-export ZSH=$ZSH
-" ~/.zshrc > ~/.zshrc-omztemp
-mv -f ~/.zshrc-omztemp ~/.zshrc
+export ZSH=\"$ZSH\"
+" "$HOME/.zshrc" > "$HOME/.zshrc-omztemp"
+mv -f "$HOME/.zshrc-omztemp" "$HOME/.zshrc"
 
 printf "${BLUE}Copying your current PATH and adding it to the end of ~/.zshrc for you.${NORMAL}\n"
 sed "/export PATH=/ c\\
 export PATH=\"$PATH\"
-" ~/.zshrc > ~/.zshrc-omztemp
-mv -f ~/.zshrc-omztemp ~/.zshrc
+" "$HOME/.zshrc" > "$HOME/.zshrc-omztemp"
+mv -f "$HOME/.zshrc-omztemp" "$HOME/.zshrc"
 
 # If this user's login shell is not already "zsh", attempt to switch.
 TEST_CURRENT_SHELL=$(expr "$SHELL" : '.*/\(.*\)')
