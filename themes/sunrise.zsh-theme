@@ -2,26 +2,11 @@
 # Intended to be used with Solarized: http://ethanschoonover.com/solarized
 # (Needs Git plugin for current_branch method)
 
-# Color shortcuts
-R=$fg_no_bold[red]
-G=$fg_no_bold[green]
-M=$fg_no_bold[magenta]
-Y=$fg_no_bold[yellow]
-B=$fg_no_bold[blue]
-RESET=$reset_color
-
-if [ "$USER" = "root" ]; then
-    PROMPTCOLOR="%{$R%}" PREFIX="-!-";
-else
-    PROMPTCOLOR="" PREFIX="---";
-fi
-
-local return_code="%(?..%{$R%}%? ↵%{$RESET%})"
-
 # Get the status of the working tree (copied and modified from git.zsh)
 custom_git_prompt_status() {
+  local INDEX
   INDEX=$(git status --porcelain 2> /dev/null)
-  STATUS=""
+  local STATUS=""
   # Non-staged
   if $(echo "$INDEX" | grep '^?? ' &> /dev/null); then
     STATUS="$ZSH_THEME_GIT_PROMPT_UNTRACKED$STATUS"
@@ -66,18 +51,36 @@ function custom_git_prompt() {
   echo "$ZSH_THEME_GIT_PROMPT_PREFIX${ref#refs/heads/}$(parse_git_dirty)$(git_prompt_ahead)$(custom_git_prompt_status)$ZSH_THEME_GIT_PROMPT_SUFFIX"
 }
 
+() {
+
+# Color shortcuts
+local R=$fg_no_bold[red]
+local G=$fg_no_bold[green]
+local M=$fg_no_bold[magenta]
+local Y=$fg_no_bold[yellow]
+local B=$fg_no_bold[blue]
+local RESET=$reset_color
+
+if [ "$USER" = "root" ]; then
+    local PROMPTCOLOR="%{$R%}" 
+    local PROMPTPREFIX="-!-";
+else
+    local PROMPTCOLOR="" 
+    local PROMPTPREFIX="---";
+fi
+
+
 # %B sets bold text
-PROMPT='%B$PREFIX %2~ $(custom_git_prompt)%{$M%}%B»%b%{$RESET%} '
-RPS1="${return_code}"
+PROMPT='%B$PROMPTPREFIX %2~ $(custom_git_prompt)%F{magenta}%B»%b%f '
+RPS1="%(?..%F{red}%? ↵%f)"
+
 
 ZSH_THEME_GIT_PROMPT_PREFIX="%{$Y%}‹"
 ZSH_THEME_GIT_PROMPT_SUFFIX="%{$Y%}›%{$RESET%} "
 
 ZSH_THEME_GIT_PROMPT_DIRTY="%{$R%}*"
 ZSH_THEME_GIT_PROMPT_CLEAN=""
-
 ZSH_THEME_GIT_PROMPT_AHEAD="%{$B%}➔"
-
 
 ZSH_THEME_GIT_STATUS_PREFIX=" "
 
@@ -92,3 +95,5 @@ ZSH_THEME_GIT_PROMPT_UNTRACKED="%{$R%}?"
 ZSH_THEME_GIT_PROMPT_MODIFIED="%{$R%}M"
 ZSH_THEME_GIT_PROMPT_DELETED="%{$R%}D"
 ZSH_THEME_GIT_PROMPT_UNMERGED="%{$R%}UU"
+
+}
