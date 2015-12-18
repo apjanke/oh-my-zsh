@@ -3,17 +3,22 @@
 #         Updated to support ForkLift2 by Johan Kaving
 #
 # Usage:
-#   fl [<folder>]
+#   fl [-n] [<folder>]
 #
 # Opens specified directory or current working directory in ForkLift.app
 #
 # Notes:
-# It assumes Shift+Cmd+G launches go to folder panel and Cmd+N opens new
+# It assumes Shift+Cmd+G launches "go to folder" panel and Cmd+N opens new
 # app window.
 #
 # https://gist.github.com/3313481
 function fl {
+  local MAYBE_NEW_WINDOW DIR
   if [ ! -z "$1" ]; then
+    if [ "$1" = "-n" ]; then
+      MAYBE_NEW_WINDOW='keystroke "n" using command down'
+      shift
+    fi
     DIR=$1
     if [ ! -d "$DIR" ]; then
       DIR=$(dirname $DIR)
@@ -52,6 +57,7 @@ function fl {
 
     tell application "System Events"
       tell application process "ForkLift"
+        $MAYBE_NEW_WINDOW
         try
           set topWindow to window 1
         on error
