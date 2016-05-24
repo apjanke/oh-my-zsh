@@ -2,10 +2,30 @@
 # http://zsh.sourceforge.net/Doc/Release/Zsh-Line-Editor.html#Zle-Builtins
 # http://zsh.sourceforge.net/Doc/Release/Zsh-Line-Editor.html#Standard-Widgets
 
-# This is the old stuff we used to do to put the keypads in application mode
+# OMZ takes over zle-line-init/finish, to:
+#  a) provide hooks for multiple init/finish functions, like $precmd_functions does
+#  b) disable [sr]mkx on the few systems whose system zsh configuration enables it
+typeset -g -a zle_line_init_functions zle_line_finish_functions
+function zle-line-init() {
+  local fcn
+  for fcn in "${zle_line_init_functions[@]}"; do
+    $fcn
+  done
+}
+function zle-line-finish() {
+  local fcn
+  for fcn in "${zle_line_finish_functions[@]}"; do
+    $fcn
+  done
+}
+zle -N zle-line-init
+zle -N zle-line-finish
+
+# DEBUG: This is the old stuff we used to do to put the keypads in application mode
 # during command line editing. It's included here to make it easy to test the
 # new key binding logic under both normal and application modes. This should
 # go away once the modeless key binding stuff is tested.
+# Note: This breaks the zle-line-init/finish hooks from above.
 if (( $_OMZ_DEBUG_SMKX )); then
   if (( ${+terminfo[smkx]} )) && (( ${+terminfo[rmkx]} )); then
     function zle-line-init() {
@@ -19,6 +39,7 @@ if (( $_OMZ_DEBUG_SMKX )); then
   fi
 fi
 # end old keypad-mode stuff
+
 
 # Extra portability cursor key mappings for local-mode keypad and terminals
 # which deviate from typical terminfo entries. Supplements $terminfo.
